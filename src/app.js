@@ -4,6 +4,8 @@ const app = express();
 require("./db/conn")
 const path = require("path");
 const hbs = require("hbs")
+const cookieParser = require("cookie-parser");
+const auth = require("./middleware/auth");
 //  
 const { json } = require("express")
 const bcrypt = require("bcryptjs");
@@ -17,7 +19,9 @@ const staticPath =path.join(__dirname,"../public");
 const hbs_Path = path.join(__dirname,"../templates/views");
 const partials_Path = path.join(__dirname,"../templates/partials");
 
+
 app.use(express.json());
+app.use(cookieParser());
 app.use(express.urlencoded({ extended: false }));   
 
 app.use(express.static(staticPath));
@@ -27,21 +31,51 @@ hbs.registerPartials(partials_Path)
 // app.use(express.json())  
 // app.use(express.urlencoded({ extended: false })); 
 // html form ke andr jo bhi likha hai use get 
-// krne ke liye hmiska use krte hai
+// krne ke liye hm iska use krte hai
 
 
+// -----------------------------------------------ORDERS---------------------------------------------------------------------------------------------
 
-app.get("/",(req,res)=>{
-    res.send("hello registration page");
+app.get("/orders",auth,async(req,res)=>{
+    console.log("from orders side")
+    try{
+
+            res.render("foodPrice");
+        console.log(`token from cookies :- ${req.cookies.tokens_login}`);
+        
+    }catch(e){res.status(404).send("Something is Wrong In Orders")} 
 })
 
-// app.get("/login",(req,res)=>{
-//     res.render("Login");
-// });
+
+// -----------------------------------------------LOGOUT---------------------------------------------------------------------------------------
+
+app.get("/logout", auth, async(req,res)=>{
+    try{
+
+        // console.log("in logout:- "+current_token)
+        // console.log(req.userer_db)
+
+        //cuurent tokent ko compare krwaayenge dbs ke others tokens se matching wale ko remove kr denge  
+        req.user_db.tokens = req.user_db.tokens.filter((curentElement)=>{
+            return !(curentElement.token==req.current_token)
+        });
+        
+        res.clearCookie("tokens_login");
+        console.log("logout successfully");
+        await req.user_db.save();
+        res.render("Login");
+
+    }catch(e){res.status(500).send(e)}
+
+})
+
+// ---------------------------------------REGISTER------------------------------------------------------------------------------------------------
 
 app.get("/register",(req,res)=>{
     res.render("registration");
 });
+
+
 
 app.post("/register",async(req,res)=>{
 
@@ -62,18 +96,19 @@ app.post("/register",async(req,res)=>{
             confirmpassword:req.body.confirmpassword
         });
         // console.log('result:- '+result);
+        
 
         const see_token = await result.generateToken();
-        // console.log(" check resulted token :-"+ see_token)
+        console.log(" check resulted token :-"+ see_token)
         // console.log('result after tokens:- '+result);
+        res.cookie("tokens_inside ", see_token, {
+            expires:new Date(Date.now()+300000),
+            httpOnly:true   //iske use se isme koi change nhi kr skta client side pr
+        });
 
 
 
-
-
-
-        
-        //data ko get krna hai pehle or  Save krne se pehle is data ke password ko secure krna hai by hashing or iski koo concept of middleware  2 chij ke bech me work ho rha hoo 
+    //data ko get krna hai pehle or  Save krne se pehle is data ke password ko secure krna hai by hashing or iski koo concept of middleware  2 chij ke bech me work ho rha hoo 
 
     //    console.log(`check this:- ${this.fname}`);
         const registered_save = await result.save();
@@ -95,8 +130,11 @@ app.post("/register",async(req,res)=>{
     } 
 });
 
+// ----------------------------------------------------LOGIN------------------------------------------------------------------------------------
+
+
 app.get("/login",(req,res)=>{
-    res.render("Login");
+    res.render("Login");  
 });
 
 
@@ -126,7 +164,15 @@ app.post("/login",async(req,res)=>{
         const see_token = await email_ki_details.generateToken();
         console.log("in login:- "+see_token)
 
+        res.cookie("tokens_login", see_token, {
+            expires:new Date(Date.now()+69000000),
+            httpOnly:true,   //iske use se isme koi change nhi kr skta client side pr
+            // secure:true
+        });
+
         if(comapare_password){
+
+            
             // const verifyToken = await jwt.verify(see_token,  "SecretKey")
             // console.log(verifyToken)
             res.status(201).render("foodPage");
@@ -140,7 +186,7 @@ app.post("/login",async(req,res)=>{
 });
 
 
-
+// ------------------------------------------------TEST--------------------------------------------------------------------------------------------
 
 
 const securePassword = async(password)=>{
@@ -169,7 +215,7 @@ const createToken = async()=>{
 }
 // createToken();
   
-
+// --------------------------------------------END----------------------------------------------------------------------------------------
 
 
 
